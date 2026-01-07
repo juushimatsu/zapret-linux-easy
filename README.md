@@ -1,12 +1,12 @@
-# форк репозитория с стратегией для zapret [ImMALWARE/zapret-linux-easy](https://github.com/ImMALWARE/zapret-linux-easy)
+# форк репозитория с стратегиями для zapret [ImMALWARE/zapret-linux-easy](https://github.com/ImMALWARE/zapret-linux-easy)
 
 > **WARNING**<br>
 > Как установить стратегию я опишу тут в README. Читайте внимательно!
 > Первым делом вы должны установить zapret так как это написано разработчиками этого репозитория!
 
 > **Note**<br>
-> Стратегия взята из [темы](https://github.com/Flowseal/zapret-discord-youtube/discussions/3423) [zapret](https://github.com/Flowseal/zapret-discord-youtube) для Windows.
-> Нейронка помогла мне адаптировать стратегию под linux. Вы можете сделать то же самое адаптировав любую другую стратегию которая работает у вас.
+> Стратегии взяты из [темы](https://github.com/Flowseal/zapret-discord-youtube/discussions/3423) [zapret](https://github.com/Flowseal/zapret-discord-youtube) для Windows.
+> Нейронка помогла мне адаптировать стратегии под linux. Вы можете сделать то же самое адаптировав любую другую стратегию которая работает у вас.
 
 - - -
 
@@ -15,12 +15,19 @@
 1. Создаем папки ```files``` и ```lists``` в ```/opt/zapret```
 2. Скачивайте архивом этот репозиторий и распаковывайте.
 3. Из папки ```strategy``` копируйте содержимое папок ```files```, ```lists``` и переносите в соответствующие папки в ```/opt/zapret```.
-4. Удаляйте ```config.txt``` и переносите ```config``` из ```strategy``` в ```/opt/zapret```.
+4. Удаляйте ```config.txt``` и переносите ```general(ALT), general(FAKE TLS AUTO) ...``` и другие стратегии из ```strategy``` в ```/opt/zapret```.
 5. Берем из папки ```strategy``` файлы ```starter.sh```, ```stopper.sh```  и кидаем с заменой в ```/opt/zapret/system```.
 6. Перезапускаем zapret ```sudo systemctl restart zapret```.
 7. Готово!
 
 - - -
+
+## Смена стратегий
+
+1. Создаем файл sudo nano /usr/local/bin/zapret-switch
+2. Переносим содержимое ```strategy/zapret-switch``` в ```/usr/local/bin/zapret-switch```
+3. Делаем исполняемым sudo chmod +x /usr/local/bin/zapret-switch
+4. Запускаем скрипт sudo zapret-switch
 
 ## zapret для Linux
 [README in English](https://github.com/ImMALWARE/zapret-linux-easy/blob/main/README_EN.md)
