@@ -22,11 +22,11 @@
 
 ## Смена стратегий
 
-1. Создаем файл sudo nano /usr/local/bin/zapret-switch
+1. Создаем файл ```sudo nano /usr/local/bin/zapret-switch```
 2. Переносим содержимое ```strategy/zapret-switch``` в ```/usr/local/bin/zapret-switch```
-3. Делаем исполняемым sudo chmod +x /usr/local/bin/zapret-switch
-4. Запускаем скрипт sudo zapret-switch
-5. Проверить что применилось sudo zapret-switch --current
+3. Делаем исполняемым ```sudo chmod +x /usr/local/bin/zapret-switch```
+4. Запускаем скрипт ```sudo zapret-switch```
+5. Проверить что применилось ```sudo zapret-switch --current```
 
 Быстрое переключение стратегии на другую
 ```sudo zapret-switch --set 2```
