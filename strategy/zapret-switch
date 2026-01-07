@@ -1,0 +1,294 @@
+#!/bin/bash
+
+# Цвета для вывода
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Пути
+ZAPRET_DIR="/opt/zapret"
+STARTER_SCRIPT="$ZAPRET_DIR/system/starter.sh"
+CONFIG_LINK="$ZAPRET_DIR/config"
+
+# Доступные стратегии
+declare -A STRATEGIES=(
+    ["1"]="general(ALT11)"
+    ["2"]="general(ALT)"
+    ["3"]="general(FAKE TLS AUTO)"
+)
+
+# Функция для получения текущей стратегии
+get_current_strategy() {
+    if [ -L "$CONFIG_LINK" ]; then
+        local target=$(readlink "$CONFIG_LINK")
+        echo "$target"
+    else
+        echo "none"
+    fi
+}
+
+# Функция для установки стратегии по умолчанию
+set_default_strategy() {
+    local default_config="$ZAPRET_DIR/general(ALT11)"
+
+    if [ ! -f "$default_config" ]; then
+        echo -e "${RED}ERROR: Default config '$default_config' not found!${NC}"
+        exit 1
+    fi
+
+    if [ -e "$CONFIG_LINK" ]; then
+        rm -f "$CONFIG_LINK"
+    fi
+
+    ln -sf "$default_config" "$CONFIG_LINK"
+    echo -e "${GREEN}Default strategy 'general(ALT11)' has been set.${NC}"
+}
+
+# Функция для изменения стратегии
+switch_strategy() {
+    local strategy_name=$1
+    local config_path="$ZAPRET_DIR/$strategy_name"
+
+    # Проверяем существование конфига
+    if [ ! -f "$config_path" ]; then
+        echo -e "${RED}ERROR: Config file '$config_path' not found!${NC}"
+        return 1
+    fi
+
+    # Останавливаем службу
+    echo -e "${YELLOW}Stopping zapret service...${NC}"
+    systemctl stop zapret
+
+    # Удаляем старую ссылку
+    if [ -e "$CONFIG_LINK" ]; then
+        rm -f "$CONFIG_LINK"
+    fi
+
+    # Создаём новую символическую ссылку
+    ln -sf "$config_path" "$CONFIG_LINK"
+
+    # Запускаем службу
+    echo -e "${YELLOW}Starting zapret service with strategy: $strategy_name${NC}"
+    systemctl start zapret
+
+    sleep 2
+
+    # Проверяем статус
+    if systemctl is-active --quiet zapret; then
+        echo -e "${GREEN}✓ Strategy switched successfully to: $strategy_name${NC}"
+        echo -e "${GREEN}✓ Zapret service is running${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Failed to start zapret service!${NC}"
+        echo -e "${YELLOW}Check logs with: journalctl -u zapret -n 20${NC}"
+        return 1
+    fi
+}
+
+# Функция для отображения меню
+show_menu() {
+    local current=$(get_current_strategy)
+
+    echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║     Zapret Strategy Switcher v1.0      ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Current strategy:${NC} $(basename "$current")"
+    echo ""
+    echo -e "${GREEN}Available strategies:${NC}"
+    echo ""
+
+    for key in $(echo "${!STRATEGIES[@]}" | tr ' ' '\n' | sort); do
+        local name="${STRATEGIES[$key]}"
+        local marker=""
+        if [[ "$(basename "$current")" == "$name" ]]; then
+            marker="${GREEN}[ACTIVE]${NC}"
+        fi
+        echo -e "  ${BLUE}$key${NC}) $name $marker"
+    done
+
+    echo ""
+    echo -e "  ${BLUE}s${NC}) Show current strategy details"
+    echo -e "  ${BLUE}r${NC}) Restart zapret service"
+    echo -e "  ${BLUE}l${NC}) View zapret logs"
+    echo -e "  ${BLUE}d${NC}) Set default strategy (ALT11)"
+    echo -e "  ${BLUE}q${NC}) Quit"
+    echo ""
+}
+
+# Функция для отображения деталей текущей стратегии
+show_strategy_details() {
+    local current=$(get_current_strategy)
+    echo -e "${YELLOW}Current strategy file:${NC} $current"
+    echo ""
+
+    if [ -f "$current" ]; then
+        echo -e "${YELLOW}Strategy content preview:${NC}"
+        echo -e "${BLUE}─────────────────────────────────────────${NC}"
+        head -n 30 "$current" | grep -v "^#" | grep -v "^$" || echo "Empty or comments only"
+        echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    else
+        echo -e "${RED}Strategy file not found!${NC}"
+    fi
+}
+
+# Функция для просмотра логов
+show_logs() {
+    echo -e "${YELLOW}Last 30 lines of zapret logs:${NC}"
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+    journalctl -u zapret -n 30 --no-pager
+    echo -e "${BLUE}─────────────────────────────────────────${NC}"
+}
+
+# Функция для перезапуска службы
+restart_service() {
+    echo -e "${YELLOW}Restarting zapret service...${NC}"
+    systemctl restart zapret
+    sleep 2
+
+    if systemctl is-active --quiet zapret; then
+        echo -e "${GREEN}✓ Service restarted successfully${NC}"
+    else
+        echo -e "${RED}✗ Failed to restart service!${NC}"
+        echo -e "${YELLOW}Check logs with: journalctl -u zapret -n 20${NC}"
+    fi
+}
+
+# Главная функция
+main() {
+    # Проверяем права root
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${RED}ERROR: This script must be run as root!${NC}"
+        echo -e "${YELLOW}Please use: sudo $0${NC}"
+        exit 1
+    fi
+
+    # Проверяем существование директории zapret
+    if [ ! -d "$ZAPRET_DIR" ]; then
+        echo -e "${RED}ERROR: Zapret directory '$ZAPRET_DIR' not found!${NC}"
+        exit 1
+    fi
+
+    # Проверяем существование конфигов
+    local missing_configs=0
+    for strategy in "${STRATEGIES[@]}"; do
+        if [ ! -f "$ZAPRET_DIR/$strategy" ]; then
+            echo -e "${RED}WARNING: Config '$strategy' not found!${NC}"
+            ((missing_configs++))
+        fi
+    done
+
+    if [ $missing_configs -eq ${#STRATEGIES[@]} ]; then
+        echo -e "${RED}ERROR: No strategy configs found in $ZAPRET_DIR${NC}"
+        exit 1
+    fi
+
+    # Устанавливаем стратегию по умолчанию если конфиг не существует
+    if [ ! -e "$CONFIG_LINK" ]; then
+        echo -e "${YELLOW}No strategy configured. Setting default...${NC}"
+        set_default_strategy
+        echo ""
+    fi
+
+    # Интерактивный режим или прямой выбор
+    if [ $# -eq 0 ]; then
+        # Интерактивный режим
+        while true; do
+            show_menu
+            read -p "Select option: " choice
+
+            case $choice in
+                1|2|3)
+                    if [ -n "${STRATEGIES[$choice]}" ]; then
+                        switch_strategy "${STRATEGIES[$choice]}"
+                    else
+                        echo -e "${RED}Invalid option!${NC}"
+                    fi
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    ;;
+                s|S)
+                    show_strategy_details
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    ;;
+                r|R)
+                    restart_service
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    ;;
+                l|L)
+                    show_logs
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    ;;
+                d|D)
+                    set_default_strategy
+                    systemctl restart zapret
+                    echo ""
+                    read -p "Press Enter to continue..."
+                    ;;
+                q|Q)
+                    echo -e "${GREEN}Goodbye!${NC}"
+                    exit 0
+                    ;;
+                *)
+                    echo -e "${RED}Invalid option!${NC}"
+                    sleep 1
+                    ;;
+            esac
+        done
+    else
+        # Режим командной строки
+        case $1 in
+            --set)
+                if [ -z "$2" ]; then
+                    echo -e "${RED}ERROR: Strategy name required!${NC}"
+                    echo "Usage: $0 --set <strategy_number>"
+                    exit 1
+                fi
+
+                if [ -n "${STRATEGIES[$2]}" ]; then
+                    switch_strategy "${STRATEGIES[$2]}"
+                else
+                    echo -e "${RED}ERROR: Invalid strategy number!${NC}"
+                    echo "Available: 1, 2, 3"
+                    exit 1
+                fi
+                ;;
+            --current)
+                echo "$(basename "$(get_current_strategy)")"
+                ;;
+            --list)
+                for key in $(echo "${!STRATEGIES[@]}" | tr ' ' '\n' | sort); do
+                    echo "$key: ${STRATEGIES[$key]}"
+                done
+                ;;
+            --default)
+                set_default_strategy
+                systemctl restart zapret
+                ;;
+            --help)
+                echo "Zapret Strategy Switcher"
+                echo ""
+                echo "Usage:"
+                echo "  $0                    # Interactive mode"
+                echo "  $0 --set <number>     # Set strategy (1-3)"
+                echo "  $0 --current          # Show current strategy"
+                echo "  $0 --list             # List all strategies"
+                echo "  $0 --default          # Set default strategy (ALT11)"
+                echo "  $0 --help             # Show this help"
+                ;;
+            *)
+                echo -e "${RED}ERROR: Unknown option '$1'${NC}"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+# Запуск
+main "$@"
