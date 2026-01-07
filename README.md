@@ -20,14 +20,20 @@
 6. Перезапускаем zapret ```sudo systemctl restart zapret```.
 7. Готово!
 
-- - -
-
 ## Смена стратегий
 
 1. Создаем файл sudo nano /usr/local/bin/zapret-switch
 2. Переносим содержимое ```strategy/zapret-switch``` в ```/usr/local/bin/zapret-switch```
 3. Делаем исполняемым sudo chmod +x /usr/local/bin/zapret-switch
 4. Запускаем скрипт sudo zapret-switch
+5. Проверить что применилось sudo zapret-switch --current
+
+Быстрое переключение стратегии на другую
+```sudo zapret-switch --set 2```
+Логи
+```sudo journalctl -u zapret -n 50```
+
+- - -
 
 ## zapret для Linux
 [README in English](https://github.com/ImMALWARE/zapret-linux-easy/blob/main/README_EN.md)
